@@ -527,6 +527,10 @@ hidpp20drv_update_button_1b04(struct ratbag_button *button)
 	return rc;
 }
 
+static void
+hidpp20drv_clear_macro_8100(struct ratbag_button *button,
+			    struct hidpp20_profile *profile);
+
 static int
 hidpp20drv_update_button_8100(struct ratbag_button *button)
 {
@@ -543,6 +547,7 @@ hidpp20drv_update_button_8100(struct ratbag_button *button)
 
 	switch (action->type) {
 	case RATBAG_BUTTON_ACTION_TYPE_BUTTON:
+		hidpp20drv_clear_macro_8100(button, profile);
 		profile->buttons[button->index].button.type = HIDPP20_BUTTON_HID_TYPE;
 		profile->buttons[button->index].button.subtype = HIDPP20_BUTTON_HID_TYPE_MOUSE;
 		profile->buttons[button->index].button.buttons = action->action.button;
@@ -550,6 +555,7 @@ hidpp20drv_update_button_8100(struct ratbag_button *button)
 	case RATBAG_BUTTON_ACTION_TYPE_MACRO:
 		return hidpp20drv_update_macro_8100(button, profile);
 	case RATBAG_BUTTON_ACTION_TYPE_KEY:
+		hidpp20drv_clear_macro_8100(button, profile);
 		type = HIDPP20_BUTTON_HID_TYPE;
 		subtype = HIDPP20_BUTTON_HID_TYPE_KEYBOARD;
 		code = ratbag_hidraw_get_keyboard_usage_from_keycode(device, action->action.key);
@@ -567,6 +573,7 @@ hidpp20drv_update_button_8100(struct ratbag_button *button)
 			profile->buttons[button->index].consumer_control.consumer_control = code;
 		break;
 	case RATBAG_BUTTON_ACTION_TYPE_SPECIAL:
+		hidpp20drv_clear_macro_8100(button, profile);
 		code = hidpp20_onboard_profiles_get_code_from_special(action->action.special);
 		if (code == 0)
 			return -EINVAL;
@@ -574,7 +581,9 @@ hidpp20drv_update_button_8100(struct ratbag_button *button)
 		profile->buttons[button->index].special.special = code;
 		break;
 	case RATBAG_BUTTON_ACTION_TYPE_NONE:
-		profile->buttons[button->index].disabled.type = HIDPP20_BUTTON_HID_TYPE_NOOP;
+		hidpp20drv_clear_macro_8100(button, profile);
+		profile->buttons[button->index].subany.type = HIDPP20_BUTTON_HID_TYPE;
+		profile->buttons[button->index].subany.subtype = HIDPP20_BUTTON_HID_TYPE_NOOP;
 		break;
 	default:
 		return -ENOTSUP;
@@ -1144,6 +1153,15 @@ out:
 	profile->dirty_macros |= 1U << button->index;
 
 	return 0;
+}
+
+static void
+hidpp20drv_clear_macro_8100(struct ratbag_button *button,
+			    struct hidpp20_profile *profile)
+{
+	free(profile->macros[button->index]);
+	profile->macros[button->index] = NULL;
+	profile->dirty_macros &= ~(1U << button->index);
 }
 
 static int

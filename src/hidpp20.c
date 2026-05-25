@@ -2746,7 +2746,6 @@ hidpp20_onboard_profiles_find_free_macro_sectors(struct hidpp20_device *device,
 {
 	uint16_t sector;
 	unsigned int i;
-	int rc;
 
 	for (sector = profiles->num_profiles + 1; sector < profiles->sector_count; sector++) {
 		if (sector + count > profiles->sector_count)
@@ -2754,12 +2753,6 @@ hidpp20_onboard_profiles_find_free_macro_sectors(struct hidpp20_device *device,
 
 		for (i = 0; i < count; i++) {
 			if (used[sector + i])
-				break;
-
-			rc = hidpp20_onboard_profiles_is_empty_sector(device,
-								     profiles,
-								     sector + i);
-			if (rc <= 0)
 				break;
 		}
 
