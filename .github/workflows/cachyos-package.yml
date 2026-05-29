@@ -45,6 +45,8 @@ jobs:
           pkgver="$(sed -n "s/.*version : '\([^']*\)'.*/\1/p" meson.build | head -n1)"
           pkgrel="${GITHUB_RUN_NUMBER:-1}"
 
+          git config --global --add safe.directory "$GITHUB_WORKSPACE"
+
           install -d pkgbuild
           git archive --format=tar.gz --prefix="libratbag-${pkgver}/" -o "pkgbuild/libratbag-${pkgver}.tar.gz" HEAD
 
