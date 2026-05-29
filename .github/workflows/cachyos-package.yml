@@ -1,0 +1,90 @@
+name: cachyos-package
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    container:
+      image: archlinux:base-devel
+
+    steps:
+      - name: Install checkout dependency
+        run: pacman -Syu --noconfirm --needed git
+
+      - uses: actions/checkout@v4
+
+      - name: Install package build dependencies
+        run: |
+          pacman -Syu --noconfirm --needed \
+            check \
+            dbus \
+            glib2 \
+            json-glib \
+            libevdev \
+            libunistring \
+            meson \
+            ninja \
+            pkgconf \
+            python \
+            python-evdev \
+            python-gobject \
+            swig \
+            systemd
+
+      - name: Build pacman package
+        run: |
+          set -eux
+
+          pkgver="$(sed -n "s/.*version : '\([^']*\)'.*/\1/p" meson.build | head -n1)"
+          pkgrel="${GITHUB_RUN_NUMBER:-1}"
+
+          install -d pkgbuild
+          git archive --format=tar.gz --prefix="libratbag-${pkgver}/" -o "pkgbuild/libratbag-${pkgver}.tar.gz" HEAD
+
+          cat > pkgbuild/PKGBUILD <<PKGBUILD
+          pkgname=libratbag-git
+          pkgver=${pkgver}
+          pkgrel=${pkgrel}
+          pkgdesc='DBus daemon to configure gaming mice'
+          arch=('x86_64')
+          url='https://github.com/libratbag/libratbag'
+          license=('MIT')
+          options=('!debug')
+          depends=('dbus' 'glib2' 'json-glib' 'libevdev' 'libunistring' 'python-evdev' 'python-gobject' 'systemd-libs')
+          makedepends=('check' 'meson' 'ninja' 'pkgconf' 'swig' 'systemd')
+          provides=('libratbag')
+          conflicts=('libratbag')
+          source=("libratbag-${pkgver}.tar.gz")
+          sha256sums=('SKIP')
+
+          build() {
+            arch-meson "libratbag-${pkgver}" build -Ddocumentation=false
+            meson compile -C build
+          }
+
+          check() {
+            meson test -C build --print-errorlogs
+          }
+
+          package() {
+            meson install -C build --destdir "\$pkgdir"
+            install -Dm644 "libratbag-${pkgver}/COPYING" "\$pkgdir/usr/share/licenses/\$pkgname/COPYING"
+          }
+          PKGBUILD
+
+          useradd -m builder
+          chown -R builder:builder pkgbuild
+          su builder -c 'cd pkgbuild && makepkg --noconfirm'
+
+      - name: Upload pacman package
+        uses: actions/upload-artifact@v4
+        with:
+          name: cachyos-pacman-package
+          path: pkgbuild/*.pkg.tar.zst
